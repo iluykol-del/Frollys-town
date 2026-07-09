@@ -661,7 +661,7 @@ setInterval(() => {
   }
 }, TICK_MS);
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Город поднят на http://localhost:${PORT}`);
   console.log(`Поле ${GRID_SIZE}x${GRID_SIZE}, тик ${TICK_MS} мс, день ${DAY_TICKS} тиков, казна ${START_TREASURY}$`);
   const n = Object.keys(spriteMap).length;
