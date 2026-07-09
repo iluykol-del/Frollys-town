@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Общий город</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="lobby" class="lobby">
+    <div class="lobby-card">
+      <div class="brand"><span class="brand-mark">▚</span><h1>Общий город</h1></div>
+      <p class="tagline">Стройте один город вместе: общая казна, налоги и жители со своими нуждами.</p>
+      <label class="field"><span>Как вас зовут</span>
+        <input id="nameInput" type="text" maxlength="20" placeholder="имя игрока" autocomplete="off" /></label>
+      <button id="createBtn" class="btn btn-primary">Основать город</button>
+      <div class="divider"><span>или войти в существующий</span></div>
+      <div class="join-row">
+        <input id="codeInput" type="text" inputmode="numeric" maxlength="6" placeholder="код города" autocomplete="off" />
+        <button id="joinBtn" class="btn">Войти</button>
+      </div>
+      <p id="lobbyError" class="lobby-error" hidden></p>
+    </div>
+  </div>
+
+  <div id="game" class="game" hidden>
+    <div class="board-wrap">
+      <canvas id="board"></canvas>
+      <div id="hint" class="hint">Выберите здание справа и кликните по клетке · наведите на здание для деталей</div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <div class="code-block">
+          <span class="code-label">код города</span>
+          <button id="codeCopy" class="code-value" title="Скопировать">------</button>
+        </div>
+        <div class="wallet">
+          <span id="treasury" class="money">0</span>
+          <span id="net" class="income">±0 / тик</span>
+        </div>
+      </div>
+
+      <div id="deficit" class="deficit" hidden>⚠ Казна пуста — сервисы под угрозой, жители недовольны</div>
+
+      <div class="budget">
+        <span>👥 <b id="population">0</b></span>
+        <span>💼 <b id="employed">0</b>/<b id="jobs">0</b></span>
+        <span class="b-rev">налоги +<span id="revenue">0</span></span>
+        <span class="b-up">содержание −<span id="upkeep">0</span></span>
+      </div>
+
+      <div class="taxes">
+        <div class="tax-row">
+          <label>Жилой <b id="tRes">10</b>%</label>
+          <input id="taxRes" type="range" min="0" max="40" value="10" />
+        </div>
+        <div class="tax-row">
+          <label>Коммерческий <b id="tCom">10</b>%</label>
+          <input id="taxCom" type="range" min="0" max="40" value="10" />
+        </div>
+        <div class="tax-row">
+          <label>Имущественный <b id="tProp">5</b>%</label>
+          <input id="taxProp" type="range" min="0" max="40" value="5" />
+        </div>
+      </div>
+
+      <button id="helpBtn" class="btn btn-ghost help-btn">📖 Потребности жителей</button>
+      <div class="dayline"><span id="dayLabel">День 0</span><div class="daybar"><div id="dayfill"></div></div></div>
+
+      <div class="palette" id="palette"></div>
+      <button id="bulldozeBtn" class="btn btn-ghost tool">🧨 Снос (возврат 50%)</button>
+
+      <div class="scoreboard"><h2>Игроки</h2><ul id="players"></ul></div>
+
+      <div id="paper" class="paper">
+        <div class="paper-mast"><span class="paper-title">Городские вести</span><span id="paperDay" class="paper-day">Выпуск №0</span></div>
+        <ul id="news" class="news"></ul>
+        <div id="standings" class="standings"></div>
+      </div>
+
+      <p id="toast" class="toast" hidden></p>
+    </aside>
+  </div>
+
+  <div id="tooltip" class="tooltip" hidden></div>
+  <div id="help" class="help-overlay" hidden>
+    <div class="help-card">
+      <button id="helpClose" class="help-close" title="Закрыть">✕</button>
+      <h2>Потребности жителей</h2>
+      <div id="helpBody"></div>
+    </div>
+  </div>
+
+  <script src="client.js"></script>
+</body>
+</html>
