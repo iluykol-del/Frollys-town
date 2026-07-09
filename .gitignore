@@ -1,0 +1,1 @@
+"node_modules/`nnpm-debug.log`n.DS_Store" | Out-File -Encoding utf8 .gitignore
