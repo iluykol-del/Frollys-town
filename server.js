@@ -81,8 +81,8 @@ const TAX_MAX = 40;
 const PROPERTY_UNIT = 10;        // база имущественного налога на здание
 
 // --- Счастье и миграция ---
-const GROW_H = 50;               // счастье, при котором приезжают жители
-const LEAVE_H = 35;              // счастье, при котором уезжают
+const GROW_H = 40;               // счастье, при котором дом начинает заселяться
+const LEAVE_H = 30;              // счастье, при котором уезжают
 const MOVE_COST = 40;            // накопления домохозяйства для переезда внутри города
 
 // --- События ---
@@ -229,7 +229,7 @@ function districtOf(room, x, y) {
 
 // --- Счастье домохозяйства (0..100) ---
 function happiness(level, pop, cap, taxes, crime, epidemic, deficit, extra) {
-  let h = 10 + (level / MAX_TIER) * 70;
+  let h = 20 + (level / MAX_TIER) * 70;
   const soft = cap * 0.8;
   if (pop > soft) h -= (pop - soft) * 12;   // теснота
   h -= taxes.residential * 0.6;             // жилой налог бьёт сильнее
@@ -274,8 +274,17 @@ function computeSim(room) {
   // Ресурсы: производство воды (колодцы) и еды (фермы × трава в радиусе)
   let waterProd = 0, foodProd = 0;
   for (const p of providers) {
-    if (p.type === 'well') waterProd += WATER_PER_WELL;
-    else if (p.type === 'farm') {
+    if (p.type === 'well') {
+      let water = 0;
+      for (let dy = -p.r; dy <= p.r; dy++)
+        for (let dx = -p.r; dx <= p.r; dx++) {
+          if (!covers(p.shape, dx, dy, p.r)) continue;
+          const gx = p.x + dx, gy = p.y + dy;
+          if (gx < 0 || gy < 0 || gx >= GRID_SIZE || gy >= GRID_SIZE) continue;
+          if (terrainAt(room, gx, gy) === 'w') water += 1;
+        }
+      if (water > 0) waterProd += WATER_PER_WELL; // есть вода в радиусе — качает норму, иначе сухой
+    } else if (p.type === 'farm') {
       let grass = 0;
       for (let dy = -p.r; dy <= p.r; dy++)
         for (let dx = -p.r; dx <= p.r; dx++) {
@@ -313,8 +322,8 @@ function computeSim(room) {
     }
     const needs = {};
     for (const need of NEEDS) needs[need.key] = need.providers.some((t) => inRangeTypes.has(t));
-    if (waterShort) needs.water = false;   // в городе кончилась вода
-    if (foodShort) needs.food = false;     // в городе кончилась еда
+    needs.water = !waterShort;   // покрытие воды/еды — от общего склада, не от радиуса
+    needs.food = !foodShort;
     if (crimeSet.has(hDist)) needs.security = false;
     if (festivalSet.has(hDist)) needs.community = true;
 
@@ -496,7 +505,10 @@ function runDay(room) {
     .sort((a, b) => b.info.happy - a.info.happy);
   for (const h of arrivals) {
     if (immBudget <= 0) break;
-    h.cell.pop += 1; immBudget -= 1;
+    const room4 = (h.cell.cap || HOUSE_CAP) - h.cell.pop;
+    const speed = h.info.happy >= 60 ? 2 : 1;            // счастливые заселяются быстрее
+    const gain = Math.min(immBudget, room4, speed);
+    h.cell.pop += gain; immBudget -= gain;
   }
   const sinks = list.filter((h) => h.cell.pop < (h.cell.cap || HOUSE_CAP))
     .sort((a, b) => b.info.happy - a.info.happy);
@@ -647,7 +659,7 @@ function onPlace(ws, msg) {
   if (room.treasury < def.cost) return send(ws, { type: 'error', message: 'В казне не хватает денег' });
   room.treasury -= def.cost;
   const cell = { type: building, owner: ws.pid };
-  if (def.kind === 'house') { cell.pop = 1; cell.cap = HOUSE_CAP; cell.savings = 0; }
+  if (def.kind === 'house') { cell.pop = 0; cell.cap = HOUSE_CAP; cell.savings = 0; }
   room.grid.set(key, cell);
   room.lastActive = Date.now();
   broadcast(room);
