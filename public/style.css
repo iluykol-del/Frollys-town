@@ -99,11 +99,24 @@ input[type="text"]:focus { outline: none; border-color: var(--brass); }
 .game {
   min-height: 100%;
   display: flex;
-  gap: 20px;
+  flex-direction: column;
+  gap: 14px;
   padding: 20px;
-  align-items: flex-start;
-  justify-content: center;
+  align-items: center;
 }
+.stage { display: flex; gap: 20px; align-items: flex-start; justify-content: center; width: 100%; }
+.assets {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  padding: 8px 12px; border-radius: 14px;
+  background: var(--paper, #f7f4ec); box-shadow: 0 8px 24px rgba(0,0,0,.25);
+}
+.asset { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 10px; background: var(--paper-2, #ece7db); font-size: 15px; }
+.asset .ae { font-size: 17px; }
+.asset b { font-family: 'Baloo 2', system-ui, sans-serif; }
+.asset .anet { font-style: normal; font-size: 11px; opacity: .7; margin-left: 2px; }
+.asset .anet.up { color: #2f7d46; }
+.asset .anet.down { color: #b5533f; }
+.asset.short { background: #fbe4e0; color: #a13b2b; }
 .board-wrap { position: relative; }
 #board {
   display: block;
@@ -197,7 +210,8 @@ input[type="text"]:focus { outline: none; border-color: var(--brass); }
 }
 
 @media (max-width: 720px) {
-  .game { flex-direction: column; align-items: center; padding: 12px; }
+  .game { padding: 12px; }
+  .stage { flex-direction: column; align-items: center; }
   .panel { width: min(420px, 100%); max-height: none; }
   .hint { display: none; }
 }

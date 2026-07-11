@@ -94,7 +94,7 @@ function handle(msg) {
     else if (msg.paper && !S.paper) { S.paper = msg.paper; renderPaper(); }
     syncSprites();
     if (!$('palette').childElementCount) renderPalette();
-    renderBudget(); renderTaxes(); renderScoreboard(); renderDayline(); render();
+    renderAssets(); renderBudget(); renderTaxes(); renderScoreboard(); renderDayline(); render();
   }
 }
 
@@ -152,6 +152,23 @@ function updatePaletteState() {
 }
 
 // ---------- Бюджет / налоги / счёт / день ----------
+function netTag(el, net) {
+  if (net > 0) { el.textContent = '▲' + net; el.className = 'anet up'; }
+  else if (net < 0) { el.textContent = '▼' + Math.abs(net); el.className = 'anet down'; }
+  else { el.textContent = ''; el.className = 'anet'; }
+}
+function renderAssets() {
+  const st = S.state, f = st.flows;
+  $('aMoney').textContent = st.treasury; netTag($('aMoneyNet'), f.net);
+  $('aWater').textContent = st.stock ? st.stock.water : 0; netTag($('aWaterNet'), (f.waterProd || 0) - (f.waterCons || 0));
+  $('aFood').textContent = st.stock ? st.stock.food : 0; netTag($('aFoodNet'), (f.foodProd || 0) - (f.foodCons || 0));
+  $('aPop').textContent = st.population;
+  $('aEmployed').textContent = f.employed; $('aJobs').textContent = f.jobs;
+  $('aFaith').textContent = st.faith != null ? st.faith : 0;
+  const short = st.short || {};
+  $('aWater').parentElement.classList.toggle('short', !!short.water);
+  $('aFood').parentElement.classList.toggle('short', !!short.food);
+}
 function renderBudget() {
   const st = S.state;
   $('treasury').textContent = st.treasury;

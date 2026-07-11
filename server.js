@@ -52,6 +52,14 @@ const MAX_TIER = 5;
 const SOCIAL_PROVIDERS = new Set(NEEDS.filter((n) => n.tier === 3 || n.tier === 4).flatMap((n) => n.providers));
 const SERVICE_FEE = 1;           // «оборот» коммерческого провайдера за обслуженный дом
 
+// Ресурсы-склад (еда/вода): производители льют в общий пул, жители потребляют.
+const WATER_PER_WELL = 6;        // производство воды колодцем за тик
+const FOOD_PER_GRASS = 0.5;      // еда фермы = FOOD_PER_GRASS × тайлов травы в её радиусе
+const CONSUME_WATER = 1;         // потребление воды на жителя за тик
+const CONSUME_FOOD = 1;          // потребление еды на жителя за тик
+const STOCK_CAP = 999;           // потолок склада
+const FAITH_PER_POP = 2;         // вера = население × коэффициент (пока фикс)
+
 // Рабочие места по типам зданий (жители едут только на свободные)
 const JOBS = { factory: 8, shop: 3, cafe: 3, gym: 3, theater: 3, clinic: 4, police: 4, school: 4, well: 1, farm: 1, park: 0, road: 0, house: 0 };
 function jobsOf(type) { return JOBS[type] || 0; }
@@ -262,6 +270,26 @@ function computeSim(room) {
   for (const c of cells) { if (c.type === 'house') totalPop += c.pop || 0; totalJobs += jobsOf(c.type); }
   const empFraction = totalPop > 0 ? Math.min(1, totalJobs / totalPop) : 1;
   const unempPenalty = Math.round((1 - empFraction) * UNEMP_PENALTY_MAX);
+
+  // Ресурсы: производство воды (колодцы) и еды (фермы × трава в радиусе)
+  let waterProd = 0, foodProd = 0;
+  for (const p of providers) {
+    if (p.type === 'well') waterProd += WATER_PER_WELL;
+    else if (p.type === 'farm') {
+      let grass = 0;
+      for (let dy = -p.r; dy <= p.r; dy++)
+        for (let dx = -p.r; dx <= p.r; dx++) {
+          if (!covers(p.shape, dx, dy, p.r)) continue;
+          const gx = p.x + dx, gy = p.y + dy;
+          if (gx < 0 || gy < 0 || gx >= GRID_SIZE || gy >= GRID_SIZE) continue;
+          if (terrainAt(room, gx, gy) === 'g') grass += 1;
+        }
+      foodProd += grass * FOOD_PER_GRASS;
+    }
+  }
+  const waterCons = totalPop * CONSUME_WATER, foodCons = totalPop * CONSUME_FOOD;
+  const waterShort = !!(room.short && room.short.water), foodShort = !!(room.short && room.short.food);
+
   // Вредные зоны (шум, загрязнение)
   const nuisances = [];
   for (const c of cells) {
@@ -285,6 +313,8 @@ function computeSim(room) {
     }
     const needs = {};
     for (const need of NEEDS) needs[need.key] = need.providers.some((t) => inRangeTypes.has(t));
+    if (waterShort) needs.water = false;   // в городе кончилась вода
+    if (foodShort) needs.food = false;     // в городе кончилась еда
     if (crimeSet.has(hDist)) needs.security = false;
     if (festivalSet.has(hDist)) needs.community = true;
 
@@ -335,6 +365,7 @@ function computeSim(room) {
     property: Math.round(property), revenue: Math.round(revenue),
     upkeep: Math.round(upkeep), net: Math.round(revenue - upkeep),
     jobs: totalJobs, employed: Math.min(totalPop, totalJobs), population: totalPop,
+    waterProd: Math.round(waterProd), waterCons, foodProd: Math.round(foodProd), foodCons,
   };
   return { houseInfo, served, dOf, flows };
 }
@@ -526,6 +557,8 @@ function serializeState(room) {
       online: !!(p.ws && p.ws.readyState === WebSocket.OPEN),
     })),
     treasury: Math.floor(room.treasury), taxes: room.taxes, deficit: !!room.deficit,
+    stock: room.stock || { water: 0, food: 0 }, short: room.short || { water: false, food: false },
+    faith: (function () { let p = 0; for (const c of room.grid.values()) if (c.type === 'house') p += c.pop || 0; return p * FAITH_PER_POP; })(),
     flows: sim.flows, population,
     catalog: BUILDINGS, needs: NEEDS, tierLabels: TIER_LABEL, sprites: spriteMap, houseCap: HOUSE_CAP,
     jobs: JOBS, terrainMeta: TERRAIN, terrainSprites,
@@ -579,7 +612,7 @@ function onJoin(ws, msg) {
   let room, isNew = false;
   if (!code) {
     code = genCode();
-    room = { code, grid: new Map(), players: new Map(), hostPid: null, lastActive: Date.now(), tick: 0, day: 0, treasury: START_TREASURY, taxes: { ...DEFAULT_TAXES }, deficit: false, districts: [], nextDistrictId: 0, terrain: genTerrain() };
+    room = { code, grid: new Map(), players: new Map(), hostPid: null, lastActive: Date.now(), tick: 0, day: 0, treasury: START_TREASURY, taxes: { ...DEFAULT_TAXES }, deficit: false, districts: [], nextDistrictId: 0, terrain: genTerrain(), stock: { water: 0, food: 0 }, short: { water: false, food: false } };
     rooms.set(code, room);
     isNew = true;
   } else {
@@ -652,6 +685,15 @@ setInterval(() => {
     room.treasury += sim.flows.net;
     if (room.treasury < 0) { room.treasury = 0; room.deficit = true; } else room.deficit = false;
 
+    // Склад ресурсов: + производство − потребление, флаг дефицита для следующего тика
+    if (!room.stock) room.stock = { water: 0, food: 0 };
+    if (!room.short) room.short = { water: false, food: false };
+    const nw = room.stock.water + sim.flows.waterProd - sim.flows.waterCons;
+    const nf = room.stock.food + sim.flows.foodProd - sim.flows.foodCons;
+    room.short.water = nw < 0; room.short.food = nf < 0;
+    room.stock.water = clamp(nw, 0, STOCK_CAP);
+    room.stock.food = clamp(nf, 0, STOCK_CAP);
+
     room.tick = (room.tick || 0) + 1;
     if (room.tick % DAY_TICKS === 0) runDay(room);
 
@@ -661,7 +703,7 @@ setInterval(() => {
   }
 }, TICK_MS);
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, () => {
   console.log(`Город поднят на http://localhost:${PORT}`);
   console.log(`Поле ${GRID_SIZE}x${GRID_SIZE}, тик ${TICK_MS} мс, день ${DAY_TICKS} тиков, казна ${START_TREASURY}$`);
   const n = Object.keys(spriteMap).length;
